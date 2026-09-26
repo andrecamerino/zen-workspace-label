@@ -2,7 +2,7 @@
   "id": "zen-workspace-label",
   "name": "Zen Workspace Label",
   "description": "Shows the active workspace's emoji and name in the nav-bar next to the url bar, so it stays visible with the sidebar collapsed.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "scripts": {
     "workspace-label.uc.js": {}
   }

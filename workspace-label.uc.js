@@ -3,12 +3,13 @@
 // url bar. Zen's own workspace name/icon indicator only lives inside the
 // (collapsible) sidebar, so it disappears whenever the sidebar is hidden.
 //
-// gZenWorkspaces.getActiveWorkspaceFromCache() is Zen's own source of truth
-// for "which workspace is active right now" (see ZenSpaceManager.mjs) - read
-// straight from it instead of re-deriving it from event payloads or sidebar
-// DOM state, both of which are timing-sensitive. Zen dispatches
-// "ZenWorkspacesUIUpdate" on window whenever the active workspace changes,
-// is renamed, or the workspace list changes, so that's the refresh signal.
+// gZenWorkspaces.addChangeListeners() is Zen's own hook for "a workspace
+// switch just finished" (see #updateWorkspaceState in ZenSpaceManager.mjs) -
+// it fires on every switch and hands us the new workspace directly, so
+// there's no re-query needed. "ZenWorkspacesUIUpdate", used in an earlier
+// version of this mod, looked like the right event but Zen only actually
+// dispatches it during session-restore/init - it never fires on a plain
+// Ctrl+H/L or icon-click switch, which is why the label used to go stale.
 (function () {
   if (window.__zenWorkspaceLabelInstalled) return;
   window.__zenWorkspaceLabelInstalled = true;
@@ -24,26 +25,38 @@
     return label;
   }
 
-  function update() {
+  function render(workspace, workspaceCount) {
     const label = ensureLabel();
-    const zenWorkspaces = window.gZenWorkspaces;
-    const workspaces = zenWorkspaces?.getWorkspaces?.() ?? [];
-    if (!zenWorkspaces || workspaces.length <= 1) {
+    if (!workspace || workspaceCount <= 1) {
       // Nothing to disambiguate - stay out of the way.
       label.hidden = true;
       return;
     }
-    const active = zenWorkspaces.getActiveWorkspaceFromCache?.();
-    if (!active) {
-      label.hidden = true;
-      return;
-    }
-    const isSvgIcon = active.icon && active.icon.endsWith(".svg");
-    const icon = active.icon && !isSvgIcon ? `${active.icon} ` : "";
+    const isSvgIcon = workspace.icon && workspace.icon.endsWith(".svg");
+    const icon = workspace.icon && !isSvgIcon ? `${workspace.icon} ` : "";
     label.hidden = false;
-    label.textContent = `${icon}${active.name ?? ""}`;
+    label.textContent = `${icon}${workspace.name ?? ""}`;
   }
 
+  function update() {
+    const zenWorkspaces = window.gZenWorkspaces;
+    const workspaces = zenWorkspaces?.getWorkspaces?.() ?? [];
+    render(zenWorkspaces?.getActiveWorkspaceFromCache?.(), workspaces.length);
+  }
+
+  window.addEventListener(
+    "load",
+    () => {
+      update();
+      window.gZenWorkspaces?.addChangeListeners(({ workspace }) => {
+        render(workspace, window.gZenWorkspaces.getWorkspaces().length);
+      });
+    },
+    { once: true }
+  );
+
+  // Safety net for cases that aren't a "switch" but still change what should
+  // be displayed - the workspace list changing (add/remove) or a rename.
   window.addEventListener("ZenWorkspacesUIUpdate", update, true);
-  window.addEventListener("load", update, { once: true });
+  window.addEventListener("ZenWorkspaceDataChanged", update, true);
 })();
