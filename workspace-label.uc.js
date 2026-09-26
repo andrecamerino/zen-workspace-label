@@ -3,13 +3,14 @@
 // url bar. Zen's own workspace name/icon indicator only lives inside the
 // (collapsible) sidebar, so it disappears whenever the sidebar is hidden.
 //
-// gZenWorkspaces.addChangeListeners() is Zen's own hook for "a workspace
-// switch just finished" (see #updateWorkspaceState in ZenSpaceManager.mjs) -
-// it fires on every switch and hands us the new workspace directly, so
-// there's no re-query needed. "ZenWorkspacesUIUpdate", used in an earlier
-// version of this mod, looked like the right event but Zen only actually
-// dispatches it during session-restore/init - it never fires on a plain
-// Ctrl+H/L or icon-click switch, which is why the label used to go stale.
+// Update trigger: Zen writes the active workspace's uuid to the
+// "zen.workspaces.active" pref on every switch, unconditionally, in the
+// `activeWorkspace` setter (ZenSpaceManager.mjs) - unlike its own UI events
+// ("ZenWorkspacesUIUpdate" only fires during session-restore/init, and
+// gZenWorkspaces.addChangeListeners isn't guaranteed to exist across
+// versions), this pref write isn't gated to anything and is stable browser
+// plumbing rather than an internal implementation detail, so it's the one
+// thing that reliably fires on a plain Ctrl+H/L or icon-click switch.
 (function () {
   if (window.__zenWorkspaceLabelInstalled) return;
   window.__zenWorkspaceLabelInstalled = true;
@@ -44,19 +45,17 @@
     render(zenWorkspaces?.getActiveWorkspaceFromCache?.(), workspaces.length);
   }
 
+  const prefObserver = { observe: update };
+  Services.prefs.addObserver("zen.workspaces.active", prefObserver);
   window.addEventListener(
-    "load",
-    () => {
-      update();
-      window.gZenWorkspaces?.addChangeListeners(({ workspace }) => {
-        render(workspace, window.gZenWorkspaces.getWorkspaces().length);
-      });
-    },
+    "unload",
+    () => Services.prefs.removeObserver("zen.workspaces.active", prefObserver),
     { once: true }
   );
 
-  // Safety net for cases that aren't a "switch" but still change what should
-  // be displayed - the workspace list changing (add/remove) or a rename.
+  // Covers list-level changes (rename/add/remove) that don't touch the pref.
   window.addEventListener("ZenWorkspacesUIUpdate", update, true);
   window.addEventListener("ZenWorkspaceDataChanged", update, true);
+
+  window.addEventListener("load", update, { once: true });
 })();
