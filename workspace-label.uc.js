@@ -1,13 +1,14 @@
-// workspace-label.uc.js — Sine mod: shows the active workspace's name in the
-// nav-bar, just to the right of the url bar. Zen's own workspace name/icon
-// indicator only lives inside the (collapsible) sidebar, so it disappears
-// whenever the sidebar is hidden.
+// workspace-label.uc.js — Sine mod: shows the active workspace's name (and
+// its emoji icon, if it has one) in the nav-bar, just to the right of the
+// url bar. Zen's own workspace name/icon indicator only lives inside the
+// (collapsible) sidebar, so it disappears whenever the sidebar is hidden.
 //
-// Zen dispatches "ZenWorkspacesUIUpdate" on window whenever the active
-// workspace changes, is renamed, or the workspace list changes (see
-// nsZenWorkspaceIcons in zen-browser/desktop's ZenSpaceIcons.mjs).
-// event.detail.activeIndex is the active workspace's uuid (despite the
-// name) - gZenWorkspaces.getWorkspaces() resolves that uuid to {name, icon}.
+// gZenWorkspaces.getActiveWorkspaceFromCache() is Zen's own source of truth
+// for "which workspace is active right now" (see ZenSpaceManager.mjs) - read
+// straight from it instead of re-deriving it from event payloads or sidebar
+// DOM state, both of which are timing-sensitive. Zen dispatches
+// "ZenWorkspacesUIUpdate" on window whenever the active workspace changes,
+// is renamed, or the workspace list changes, so that's the refresh signal.
 (function () {
   if (window.__zenWorkspaceLabelInstalled) return;
   window.__zenWorkspaceLabelInstalled = true;
@@ -23,33 +24,26 @@
     return label;
   }
 
-  function setActiveByUuid(uuid) {
+  function update() {
     const label = ensureLabel();
-    const workspaces = window.gZenWorkspaces?.getWorkspaces?.() ?? [];
-    if (workspaces.length <= 1) {
+    const zenWorkspaces = window.gZenWorkspaces;
+    const workspaces = zenWorkspaces?.getWorkspaces?.() ?? [];
+    if (!zenWorkspaces || workspaces.length <= 1) {
       // Nothing to disambiguate - stay out of the way.
       label.hidden = true;
       return;
     }
-    const active = workspaces.find((w) => w.uuid === uuid) ?? workspaces[0];
+    const active = zenWorkspaces.getActiveWorkspaceFromCache?.();
+    if (!active) {
+      label.hidden = true;
+      return;
+    }
+    const isSvgIcon = active.icon && active.icon.endsWith(".svg");
+    const icon = active.icon && !isSvgIcon ? `${active.icon} ` : "";
     label.hidden = false;
-    label.textContent = active?.name ?? "";
+    label.textContent = `${icon}${active.name ?? ""}`;
   }
 
-  window.addEventListener(
-    "ZenWorkspacesUIUpdate",
-    (event) => setActiveByUuid(event.detail?.activeIndex),
-    true
-  );
-
-  window.addEventListener(
-    "load",
-    () => {
-      const activeButton = document.querySelector(
-        "#zen-workspaces-button toolbarbutton[active]"
-      );
-      setActiveByUuid(activeButton?.getAttribute("zen-workspace-id"));
-    },
-    { once: true }
-  );
+  window.addEventListener("ZenWorkspacesUIUpdate", update, true);
+  window.addEventListener("load", update, { once: true });
 })();
