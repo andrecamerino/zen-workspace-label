@@ -1,8 +1,8 @@
 {
   "id": "zen-workspace-label",
   "name": "Zen Workspace Label",
-  "description": "Shows the active workspace's name in the top toolbar, so it stays visible with the sidebar collapsed.",
-  "version": "1.0.0",
+  "description": "Shows the active workspace's name in the nav-bar next to the url bar, so it stays visible with the sidebar collapsed.",
+  "version": "1.1.0",
   "scripts": {
     "workspace-label.uc.js": {}
   }

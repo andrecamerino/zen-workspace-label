@@ -1,6 +1,7 @@
 // workspace-label.uc.js — Sine mod: shows the active workspace's name in the
-// top toolbar. Zen's own workspace name/icon indicator only lives inside the
-// (collapsible) sidebar, so it disappears whenever the sidebar is hidden.
+// nav-bar, just to the right of the url bar. Zen's own workspace name/icon
+// indicator only lives inside the (collapsible) sidebar, so it disappears
+// whenever the sidebar is hidden.
 //
 // Zen dispatches "ZenWorkspacesUIUpdate" on window whenever the active
 // workspace changes, is renamed, or the workspace list changes (see
@@ -16,8 +17,9 @@
     if (label) return label;
     label = document.createXULElement("label");
     label.id = "zen-workspace-toolbar-label";
-    const toolbar = document.getElementById("TabsToolbar");
-    toolbar.insertBefore(label, toolbar.firstChild);
+    label.setAttribute("crop", "end");
+    const urlbarContainer = document.getElementById("urlbar-container");
+    urlbarContainer.after(label);
     return label;
   }
 
